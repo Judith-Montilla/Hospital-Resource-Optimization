@@ -1,8 +1,8 @@
 # Hospital Resource Optimization Using Predictive Modeling and Linear Programming
 
 # Objective:
-# This case study aims to optimize hospital resources, such as beds and staff, using predicted patient lengths of stay to maximize operational efficiency and patient care. 
-# The focus is on ensuring resources are allocated in a way that meets patient needs while maintaining operational efficiency across multiple hospital facilities.
+# This case study aims to optimize hospital resources (beds and staff) based on predicted patient length of stay.
+# The analysis uses Random Forest for length of stay prediction and linear programming for resource optimization across multiple facilities.
 
 # Key Points:
 # - End-to-end analysis covering data preprocessing, predictive modeling (Random Forest), and resource optimization using linear programming.
@@ -26,115 +26,113 @@ file_path = r"C:\Users\JUDIT\Desktop\Data Sets\LengthOfStay.csv"
 df = pd.read_csv(file_path)
 
 # Step 2: Data Cleaning
-# Convert date columns to datetime for better manipulation
+# Convert admission and discharge dates to datetime format
 df['vdate'] = pd.to_datetime(df['vdate'], errors='coerce')
 df['discharged'] = pd.to_datetime(df['discharged'], errors='coerce')
 
-# Handle missing values (median for numerical, mode for categorical)
-# Avoid chained assignment warnings by using loc
+# Handle missing values by using median for numerical variables and mode for categorical variables
 for col in df.columns:
     if df[col].dtype == 'object':
-        df.loc[:, col] = df[col].fillna(df[col].mode()[0])
+        df[col] = df[col].fillna(df[col].mode()[0])
     else:
-        df.loc[:, col] = df[col].fillna(df[col].median())
-
-# Print the cleaned data to verify
-print("Cleaned Data Sample:\n", df.head())
+        df[col] = df[col].fillna(df[col].median())
 
 # Step 3: Feature Selection for Predictive Modeling
+# Select the features and target variable for predicting length of stay
 features = ['gender', 'dialysisrenalendstage', 'asthma', 'irondef', 'pneum',
             'psychologicaldisordermajor', 'glucose', 'bloodureanitro', 'creatinine', 'bmi', 
             'pulse', 'respiration', 'secondarydiagnosisnonicd9']
-
 df['gender'] = df['gender'].map({'F': 0, 'M': 1})
-
-X = df[features]  # Feature matrix
-y = df['lengthofstay']  # Target variable
+X = df[features]
+y = df['lengthofstay']
 
 # Step 4: Data Preprocessing
+# Split the data into training and testing sets and standardize the numerical features
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-
 scaler = StandardScaler()
 X_train_scaled = scaler.fit_transform(X_train)
 X_test_scaled = scaler.transform(X_test)
 
-print("\nFirst 5 rows of scaled training data:\n", X_train_scaled[:5])
-
 # Step 5: Predictive Modeling
+# Train a Random Forest model to predict length of stay
 rf_model = RandomForestRegressor(n_estimators=100, random_state=42)
 rf_model.fit(X_train_scaled, y_train)
 
 # Step 6: Model Evaluation
+# Evaluate the model's performance
 y_pred = rf_model.predict(X_test_scaled)
 mse = mean_squared_error(y_test, y_pred)
 r2 = r2_score(y_test, y_pred)
-
-print(f"\nModel Performance:\nMSE: {mse}\nR2 Score: {r2}")
+print(f"Model Performance:\nMSE: {mse}\nR² Score: {r2}")
 
 # Step 7: Resource Optimization Using Linear Programming
+# Define the number of available beds and staff for optimization
 beds = 100
 staff = 50
 
+# Predict the length of stay for the entire dataset
 predicted_los = rf_model.predict(scaler.transform(X))
-print("\nFirst 5 predicted Length of Stay values:\n", predicted_los[:5])
 
+# Create variables for the number of beds and staff allocated to each facility
 facilities = df['facid'].unique()
 facility_beds = LpVariable.dicts("Beds", facilities, lowBound=0, cat='Integer')
 facility_staff = LpVariable.dicts("Staff", facilities, lowBound=0, cat='Integer')
 
+# Define the linear programming problem
 problem = LpProblem("Resource_Optimization", LpMaximize)
 
+# Maximize the total allocation of beds and staff across all facilities
 problem += lpSum([facility_beds[i] + facility_staff[i] for i in facilities])
 
+# Set the constraints for total beds and staff available
 problem += lpSum([facility_beds[i] for i in facilities]) <= beds
 problem += lpSum([facility_staff[i] for i in facilities]) <= staff
 
+# Ensure that each facility receives at least half the average predicted length of stay in beds, and a quarter in staff
 for i in facilities:
     avg_los_facility = np.mean(predicted_los[df['facid'] == i])
     problem += facility_beds[i] >= avg_los_facility / 2
     problem += facility_staff[i] >= avg_los_facility / 4
 
+# Solve the linear programming problem
 problem.solve()
 
-print(f"\nOptimized Bed Allocation:")
+# Display the optimized allocation of beds and staff
+print("Optimized Bed Allocation:")
 for i in facilities:
     print(f"Facility {i}: {facility_beds[i].varValue} beds")
-
-print(f"\nOptimized Staff Allocation:")
+print("Optimized Staff Allocation:")
 for i in facilities:
     print(f"Facility {i}: {facility_staff[i].varValue} staff")
 
-# Step 8: Scenario Analysis and Visualization
+# Step 8: Visualization
+# Create a summary DataFrame with the optimized resource allocation
 summary_df = pd.DataFrame({
     'Facility': facilities,
     'Optimized Beds': [facility_beds[i].varValue for i in facilities],
     'Optimized Staff': [facility_staff[i].varValue for i in facilities]
 })
 
-print("\nResource Allocation Summary:\n", summary_df)
-
-# Plot the resource allocation
+# Plot the resource allocation across facilities
 plt.figure(figsize=(10, 6))
 summary_df.plot(x='Facility', y=['Optimized Beds', 'Optimized Staff'], kind='bar')
 plt.title("Optimized Hospital Resource Allocation")
 plt.xlabel("Facility")
 plt.ylabel("Number of Resources")
 
-# Save the plot as an image in the same file path
+# Save the plot as an image
 output_image_path = r"C:\Users\JUDIT\Desktop\Data Sets\optimized_hospital_resource_allocation.png"
 plt.savefig(output_image_path)
-
-# Show the plot
 plt.show()
 
-print(f"Graph saved at {output_image_path}")
-
-# Conclusion:
-# The Random Forest model was able to predict patient length of stay with an R² score of 0.217, providing sufficient insights for resource planning.
-# Linear programming was used to optimize the allocation of beds and staff across different hospital facilities.
-# Facility E had the highest resource demand, receiving 90 beds and 44 staff, while other facilities required significantly fewer resources.
-# This analysis demonstrates how predictive modeling combined with optimization techniques can significantly improve resource allocation in healthcare settings, ensuring that facilities are staffed and equipped according to patient demand.
+# Step 9: Conclusion:
+# The Random Forest model predicted patient length of stay with an R² score of 0.217.
+# Linear programming was used to allocate beds and staff efficiently across facilities.
+# Facility E required the most resources, receiving 90 beds and 44 staff, while other facilities required significantly fewer resources.
+# This analysis demonstrates the potential for optimizing hospital resources using predictive modeling and optimization techniques.
 
 # Future Work:
-# Future improvements could include experimenting with other predictive models to improve the accuracy of length of stay predictions or incorporating additional features like patient readmission rates.
-# Further scenario analysis could also explore the impact of varying bed and staff availability, allowing hospital administrators to plan for different demand scenarios.
+# - Model Improvement: Further exploration of more advanced models, such as XGBoost or Gradient Boosting, could improve the prediction accuracy for patient length of stay.
+# - Feature Engineering: Incorporating additional features, such as patient readmission history or hospital department information, could enhance the predictive power of the model.
+# - Real-Time Resource Management: Integrating real-time data streams from hospital systems could enable dynamic adjustment of resource allocation based on actual patient loads.
+# - Scenario Analysis: Additional scenario analyses could simulate varying levels of resource availability (e.g., during flu season or COVID-19 spikes) to ensure hospitals are prepared for surges in patient demand.
