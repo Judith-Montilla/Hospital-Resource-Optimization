@@ -4,7 +4,7 @@
 The primary objective of this project is to optimize hospital resources, such as beds and staff, based on predicted patient length of stay (LOS). By developing a predictive model using XGBoost and applying linear programming, this project aims to help hospital administrators allocate resources efficiently to improve patient outcomes and operational efficiency. The goal is to predict patient length of stay based on patient demographics and health conditions, and use those predictions to optimize resource distribution across facilities.
 
 ## Dataset Description
-- **Source:** Hospital Admissions Dataset (fictional for this case study)
+- **Source:** Kaggle - [Hospital Length of Stay Dataset](https://www.kaggle.com/datasets/aayushchou/hospital-length-of-stay-dataset-microsoft)
 - **Features:**
   - **Demographics:** Gender
   - **Health Metrics:** BMI, dialysis status, asthma, iron deficiency, psychological disorder, glucose, blood urea nitrogen, creatinine, pulse, respiration
